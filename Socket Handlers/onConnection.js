@@ -100,21 +100,27 @@ function roomHandling(socket) {
         socket.on(ADMIN_CREATE_CLASS, (room) => {
             // Manage avoiding duplicacy of room Names through the api
             socket.join(room)
-            document.set(room, {
-                doc: new Y.Doc(), // Each room will have its own Doc()
-                clients: new Set(),
-                creator: socket.id
-            })
+            if (document.has(room)) {
+                document.get(room).creator = socket.id
+            }
+            else {
+                document.set(room, {
+                    doc: new Y.Doc(), // Each room will have its own Doc()
+                    clients: new Set(),
+                    creator: socket.id
+                })
+            }
             console.log(`${socket.data.user.name} created Room - ${room}`)
+            // console.log(document)
         })
 
         // needs further upgrades
         socket.on(ADMIN_CLOSE_CLASS, async (room) => {
             // Explicitly disconnect all users
             const socketsInRoom = await io.in(room).fetchSockets();
-            
+
             io.to(room).emit(`leave-room-${room}`) // This makes all users redirect to their main page
-            
+
             socketsInRoom.forEach((socket) => {
                 socket.leave(room); // Make the socket leave the room
             });
