@@ -62,10 +62,15 @@ function init(server) {
 
             // After admin login every time a new user joins the whole map is sent look for optimization here
             // In this case admin will now no longer get his/her own online status
-            if (adminSocketID) {
-                // console.log("Online emitted")
-                io.to(adminSocketID).emit("online-users", [...users.keys()])
-            }
+            // if (adminSocketID) {
+            //     // console.log("Online emitted")
+            //     io.to(adminSocketID).emit("online-users", [...users.keys()])
+            // }
+
+            // When admin logs in , only goes to admin socket
+            socket.on("get-online-users", () => {
+                socket.emit("online-users", [...users.keys()])
+            })
 
             // Same problem here after every delete
             socket.on("disconnect", () => {
@@ -79,7 +84,7 @@ function init(server) {
                     // Making the user leave all the joined rooms
                     document.forEach((value, key) => {
                         socket.leave(key)
-                        value.clients.delete(socket.id)
+                        value.clients.delete(socket.data.user.userId)
                     })
                 }
 
@@ -106,7 +111,7 @@ function roomHandling(socket) {
             else {
                 document.set(room, {
                     doc: new Y.Doc(), // Each room will have its own Doc()
-                    clients: new Set(),
+                    clients: new Set(), // Contains user Ids
                     creator: socket.id
                 })
             }
@@ -176,15 +181,25 @@ function roomHandling(socket) {
             throw new Error("Room doesn't exist")
         }
         else {
-            document.get(room).clients.add(socket.id)
+            document.get(room).clients.add(socket.data.user.userId)
             socket.join(room)
+            // Sends the online participants
+            console.log(document.get(room).clients)
+            io.to(adminSocketID).emit(`participants:${room}`, [...document.get(room).clients])
             console.log(`${socket.data.user.name} joined Room - ${room}`)
         }
     })
 
+    // When the admin reloads his page or goes back and forth between different rooms this will be an initial call
+    socket.on("get-participants", (room) => {
+        socket.emit(`participants:${room}`, [...document.get(room).clients])
+    })
+
     socket.on("leave-room", (room) => {
         socket.leave(room)
-        document.get(room).clients.delete(socket.id)
+        document.get(room).clients.delete(socket.data.user.userId)
+        // Sends the online participants
+        io.to(adminSocketID).emit(`participants:${room}`, [...document.get(room).clients])
         console.log(`${socket.data.user.name} has left the Room - ${room}`)
     })
 
